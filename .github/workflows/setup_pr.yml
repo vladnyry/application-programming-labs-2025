@@ -46,6 +46,13 @@ jobs:
           fi
           echo "SUCCESS: Group number was parsed correctly - $GROUP"
 
+      - name: Remove all labels
+        if: github.event.action == 'reopened'
+        uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          labels: "*"
+
       - name: Setting PR labels
         uses: actions-ecosystem/action-add-labels@v1
         with:
