@@ -50,8 +50,8 @@ jobs:
         uses: actions-ecosystem/action-add-labels@v1
         with:
           labels: |
-            $LABEL
-            $GROUP
+            ${{ env.LABEL }}
+            ${{ env.GROUP }}
             In progress
 
       - name: Setting reviewer
