@@ -50,7 +50,6 @@ jobs:
         if: github.event.action == 'reopened'
         uses: actions/github-script@v8
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const issue_number = context.payload.pull_request.number;
             try {
