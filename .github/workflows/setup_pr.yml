@@ -82,6 +82,20 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setting reviewer
+        if: env.GROUP == '6212'
+        uses: AveryCameronUofR/add-reviewer-gh-action@1.0.3
+        with:
+          reviewers: "IlyaOv"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setting reviewer
+        if: env.GROUP == '6213'
+        uses: AveryCameronUofR/add-reviewer-gh-action@1.0.3
+        with:
+          reviewers: "vfkon"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setting reviewer
         if: env.GROUP == '6214'
         uses: AveryCameronUofR/add-reviewer-gh-action@1.0.3
         with:
