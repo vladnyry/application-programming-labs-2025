@@ -48,10 +48,24 @@ jobs:
 
       - name: Remove all labels
         if: github.event.action == 'reopened'
-        uses: actions-ecosystem/action-remove-labels@v1
+        uses: actions/github-script@v8
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          labels: "*"
+          script: |
+            const issue_number = context.payload.pull_request.number;
+            try {
+              await github.rest.issues.removeAllLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+              });
+            } catch (e) {
+              if (e.status === 404) {
+                core.info('No labels to remove.');
+              } else {
+                throw e;
+              }
+            }
 
       - name: Setting PR labels
         uses: actions-ecosystem/action-add-labels@v1
