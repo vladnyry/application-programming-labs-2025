@@ -4,12 +4,12 @@ on:
   pull_request_review:
     types: [submitted]
 
-permissions: write-all
-
 jobs:
   approved:
     if: github.event.review.state == 'approved'
     runs-on: ubuntu-latest
+    permissions: 
+      issues: write
     steps:
       - name: Удаление метки "IN PROGRESS"
         uses: actions-ecosystem/action-remove-labels@v1
