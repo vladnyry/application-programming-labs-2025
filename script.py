@@ -38,7 +38,7 @@ def get_tele_or_email(block: list[str])-> str|None:
             return part[1].strip()
     return None
 
-def is _email(value: str) -> bool:
+def is_email(value: str) -> bool:
     """
     проверка, что найденная строка явл. email
     """
@@ -74,7 +74,7 @@ def print_invalid(blocks: list[list[str]]) -> None:
             print('\n')
 
 
-def make_valid_and_print_invalid(blocks: list[list[str]])->list[list[str]]:
+def make_valid.txt_and_print_invalid(blocks: list[list[str]])->list[list[str]]:
     """
     вывод некорректных анекет и заполнение списка с правильными
     """
