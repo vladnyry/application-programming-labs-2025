@@ -28,6 +28,7 @@ def open_and_split(path: str) -> list[list[str]]:
     text = read_file(path)
     return split_into_blocks(text)
 
+
 def get_tele_or_email(block: list[str])-> str|None:
     """
     поиск строки "Номер или email:"
@@ -38,7 +39,8 @@ def get_tele_or_email(block: list[str])-> str|None:
             return part[1].strip()
     return None
 
-def is_not_email(value: str) -> bool:
+
+def is_email(value: str) -> bool:
     """
     проверка, что найденная строка не явл. email
     """
@@ -47,6 +49,7 @@ def is_not_email(value: str) -> bool:
         return bool(re.fullmatch(pattern, value.strip()))
     pattern = r'^[a-zA-Z0-9а-яА-Я]+\.([a-zA-Z0-9а-яА-Я]+\.)+[a-zA-ZА-Яа-я]{2,}$'
     return bool(re.fullmatch(pattern, value.strip()))
+
 
 def is_valid_num(phone:str) ->bool:
     """
@@ -62,11 +65,22 @@ def is_valid_num(phone:str) ->bool:
     return False
 
 
-def print_and_delete(blocks: list[list[str]])->list[list[str]]:
+def print_invalid(blocks: list[list[str]])-> None:
+	"""
+	вывод некорректных анкет
+	"""
+	print("Некоректные анкеты:")
+        for i in range(len(invalid)):
+            print(i+1)
+            for j in invalid[i]:
+                print(j)
+            print('\n')
+
+
+def make_valid_txt_and_print_invalid(blocks: list[list[str]])->list[list[str]]:
     """
     вывод некорректных анекет и заполнение списка с правильными
     """
-
     valid = []
     invalid = []
 
@@ -85,12 +99,7 @@ def print_and_delete(blocks: list[list[str]])->list[list[str]]:
             invalid.append(block)
 
     if invalid:
-        print("Некоректные анкеты:")
-        for i in range(len(invalid)):
-            print(i+1)
-            for j in invalid[i]:
-                print(j)
-            print('\n')
+       print_invalid(invalid)
     return valid
 
 
@@ -108,6 +117,7 @@ def parser_t():
     )
     return parser.parse_args()
 
+
 def save_blocks_to_new_file(blocks: list[list[str]], output_path: str):
     """
     запрос абсолютного пути для сохранения и само сохранение
@@ -117,6 +127,7 @@ def save_blocks_to_new_file(blocks: list[list[str]], output_path: str):
             f.write(f"{i})\n")
             f.write("\n".join(block))
             f.write("\n\n")
+
 
 def main():
     a = parser_t()
