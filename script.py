@@ -74,7 +74,7 @@ def print_invalid(blocks: list[list[str]]) -> None:
             print('\n')
 
 
-def make_valid.txt_and_print_invalid(blocks: list[list[str]])->list[list[str]]:
+def make_valid_txt_and_print_invalid(blocks: list[list[str]])->list[list[str]]:
     """
     вывод некорректных анекет и заполнение списка с правильными
     """
