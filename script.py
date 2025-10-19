@@ -1,6 +1,6 @@
 import argparse
-import os.path
 import re
+
 
 def read_file(path: str) -> str:
     """
@@ -12,12 +12,14 @@ def read_file(path: str) -> str:
     except FileNotFoundError:
         raise FileNotFoundError(f"Файл {path} не найден.")
 
+
 def split_into_blocks(text: str) -> list[list[str]]:
     """
     Разбивает текст на блоки анкет и возвращает список списков строк
     """
     raw_blocks = re.split(r'\n\d+\)\s*', text.strip())[1:]
     return [block.strip().split('\n') for block in raw_blocks]
+
 
 def open_and_split(path: str) -> list[list[str]]:
     """
@@ -26,7 +28,7 @@ def open_and_split(path: str) -> list[list[str]]:
     text = read_file(path)
     return split_into_blocks(text)
 
-def is_tele(block: list[str])-> str|None:
+def get_tele_or_email(block: list[str])-> str|None:
     """
     поиск строки "Номер или email:"
     """
@@ -36,7 +38,7 @@ def is_tele(block: list[str])-> str|None:
             return part[1].strip()
     return None
 
-def is_not_email(value: str)->bool:
+def is_not_email(value: str) -> bool:
     """
     проверка, что найденная строка не явл. email
     """
@@ -59,6 +61,7 @@ def is_valid_num(phone:str) ->bool:
             return True
     return False
 
+
 def print_and_delete(blocks: list[list[str]])->list[list[str]]:
     """
     вывод некорректных анекет и заполнение списка с правильными
@@ -68,7 +71,7 @@ def print_and_delete(blocks: list[list[str]])->list[list[str]]:
     invalid = []
 
     for block in blocks:
-        value = is_tele(block)
+        value = get_tele_or_email(block)
         if value is None:
             invalid.append(block)
             continue
@@ -105,35 +108,31 @@ def parser_t():
     )
     return parser.parse_args()
 
-def save_blocks_to_new_file(blocks:list[list[str]], output_path: str):
+def save_blocks_to_new_file(blocks: list[list[str]], output_path: str):
     """
     запрос абсолютного пути для сохранения и само сохранение
     """
-    try:
-        with open(output_path,'w',encoding="utf-8") as f:
-            for i,block in enumerate(blocks,1):
-                f.write(f"{i})\n")
-                f.write("\n".join(block))
-                f.write("\n\n")
-    except Exception as e:
-        print("Ошибка при сохранении файла")
-
+    with open(output_path, 'w', encoding="utf-8") as f:
+        for i, block in enumerate(blocks, 1):
+            f.write(f"{i})\n")
+            f.write("\n".join(block))
+            f.write("\n\n")
 
 def main():
     a = parser_t()
 
     input_file = a.path_to_file
-
     output_path = a.output
 
     print(f"\nОткрытие файла {input_file}\n")
 
-    list_of_users = open_and_split(input_file)
+    try:
+        list_of_users = open_and_split(input_file)
+        cleared_users = print_and_delete(list_of_users)
+        save_blocks_to_new_file(cleared_users, output_path)
+    except Exception as e:
+        print("Ошибка: ", e)
 
-    cleared_users = print_and_delete(list_of_users)
 
-    save_blocks_to_new_file(cleared_users, output_path)
-
-if __name__ == "__main__":
+if __name__ == "main":
     main()
-
