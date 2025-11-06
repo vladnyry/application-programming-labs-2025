@@ -1,145 +1,286 @@
 import argparse
-import re
+import collections.abc
+import csv
+import threading
+import time
+import os
+from typing import List, Tuple, Iterator
+from icrawler.builtin import GoogleImageCrawler
 
 
-def read_file(path: str) -> str:
+"""
+f для скачивания изображением по времени
+"""
+
+
+def validate_positive_int(value: int, name: str) -> None:
     """
-    Читает содержимое файла. Выбрасывает исключение, если файл не найден
+    Проверяет, что значение является положительным целым числом.
+
+    Args:
+        value (int): Проверяемое значение.
+        name (str): Название параметра для сообщения об ошибке.
+
+    Raises:
+        ValueError: Если значение <= 0.
+    """
+    if value <= 0:
+        raise ValueError(f"Параметр '{name}' должен быть положительным, получено: {value}")
+
+
+def _count_files_in_directory(directory: str) -> int:
+    """
+    Подсчитывает количество файлов в указанной директории.
+
+    Args:
+        directory (str): Путь к директории.
+
+    Returns:
+        int: Количество файлов.
+
+    Raises:
+        OSError: Если не удалось прочитать директорию.
     """
     try:
-        with open(path, "r", encoding='utf-8') as file:
-            return file.read()
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Файл {path} не найден.")
+        return len([
+            f for f in os.listdir(directory)
+            if os.path.isfile(os.path.join(directory, f))
+        ])
+    except OSError as e:
+        raise OSError(f"Не удалось прочитать директорию '{directory}': {e}") from e
 
 
-def split_into_blocks(text: str) -> list[list[str]]:
+def download_img(
+    keyword: str,
+    out_dir: str,
+    min_img: int = 50,
+    dur: int = 60
+) -> Tuple[int, float]:
     """
-    Разбивает текст на блоки анкет и возвращает список списков строк
+    Скачивает изображения по заданному ключевому слову с ограничением
+    по минимальному количеству изображений или максимальному времени.
+
+    Args:
+        keyword (str): Ключевое слово для поиска изображений.
+        out_dir (str): Директория для сохранения изображений.
+        min_img (int): Минимальное количество изображений (по умолчанию 50).
+        dur (int): Максимальное время скачивания в секундах (по умолчанию 60).
+
+    Returns:
+        Tuple[int, float]: Кортеж из (фактическое количество изображений, затраченное время в секундах).
+
+    Raises:
+        ValueError: Если min_img или dur <= 0.
+        OSError: Если не удалось создать директорию или подсчитать файлы.
     """
-    raw_blocks = re.split(r'\n\d+\)\s*', text.strip())[1:]
-    return [block.strip().split('\n') for block in raw_blocks]
+    validate_positive_int(min_img, "min_img")
+    validate_positive_int(dur, "dur")
+
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+    except OSError as e:
+        raise OSError(f"Не удалось создать директорию '{out_dir}'") from e
+
+    def crawler_task() -> None:
+        """Задача для фонового потока: запуск краулера."""
+        crawler = GoogleImageCrawler(storage={"root_dir": out_dir})
+        crawler.crawl(keyword=keyword, max_num=10000)
+
+    thread = threading.Thread(target=crawler_task)
+    thread.daemon = True
+    thread.start()
+
+    start_time = time.time()
+    print(f"Начало скачивания изображений по ключевому слову '{keyword}'...")
+    print(f"Ограничения: минимум {min_img} изображений или максимум {dur} секунд.")
+
+    while thread.is_alive():
+        try:
+            current_count = _count_files_in_directory(out_dir)
+        except OSError:
+            current_count = 0
+
+        elapsed = time.time() - start_time
+
+        if current_count >= min_img:
+            print(f"Достигнуто требуемое количество изображений: {min_img}")
+            break
+
+        if elapsed >= dur:
+            print("Время вышло. Остановка скачивания.")
+            break
+
+        time.sleep(0.5)
+
+    total_time = time.time() - start_time
+    try:
+        final_count = _count_files_in_directory(out_dir)
+    except OSError:
+        final_count = 0
+
+    return final_count, total_time
 
 
-def open_and_split(path: str) -> list[list[str]]:
+
+def create_csv(out_dir: str, path_to_csv: str) -> None:
     """
-    Открытие файла и разбиение анкет на подсписки
+    Создаёт CSV-файл с абсолютными и относительными путями к файлам в директории.
+
+    Args:
+        out_dir (str): Директория с изображениями.
+        path_to_csv (str): Путь к создаваемому CSV-файлу.
+
+    Raises:
+        OSError: Если не удалось прочитать директорию или записать CSV.
     """
-    text = read_file(path)
-    return split_into_blocks(text)
+    try:
+        files = [
+            f for f in os.listdir(out_dir) if os.path.isfile(os.path.join(out_dir, f))
+        ]
+    except OSError as e:
+        raise OSError("беда, не смогли прочитать директорию")
 
-def get_tele_or_email(block: list[str])-> str|None:
-    """
-    поиск строки "Номер или email:"
-    """
-    for line in block:
-        if line.startswith("Номер телефона или email:"):
-            part = line.split(':',1)
-            return part[1].strip()
-    return None
-
-def is_email(value: str) -> bool:
-    """
-    проверка, что найденная строка явл. email
-    """
-    if '@' in value:
-        pattern = r'^[a-zA-Z0-9а-яА-Я._%+-]+@[a-zA-Z0-9а-яА-Я.-]+\.[a-zA-ZА-Яа-я]{2,}$'
-        return bool(re.fullmatch(pattern, value.strip()))
-    pattern = r'^[a-zA-Z0-9а-яА-Я]+\.([a-zA-Z0-9а-яА-Я]+\.)+[a-zA-ZА-Яа-я]{2,}$'
-    return bool(re.fullmatch(pattern, value.strip()))
-
-def is_valid_num(phone:str) ->bool:
-    """
-    проверка номера по форматам
-    """
-    patterns=[
-         r'^(?:\+7|8)\d{10}$',  # сплошной номер
-        r'^(?:\+7|8)(?:\s?\(\d{3}\)|\s\d{3})\s?\d{3}[\s-]?\d{2}[\s-]?\d{2}$'  # форматированный
-    ]
-    for pattern in patterns:
-        if re.fullmatch(pattern,phone.strip()):
-            return True
-    return False
+    try:
+        with open(path_to_csv, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["absolute_path", "relative_path"])
+            for filename in files:
+                full_path = os.path.abspath(os.path.join(out_dir, filename))
+                rel_path = os.path.relpath(full_path, start=os.getcwd())
+                writer.writerow([full_path, rel_path])
+    except OSError as e:
+        raise OSError("не удалось записать в csv")
 
 
-def print_invalid(blocks: list[list[str]]) -> None:
-	"""
-	вывод некорректных анкет
-	"""
-	print("Некоректные анкеты:")
-        for i in range(len(invalid)):
-            print(i+1)
-            for j in invalid[i]:
-                print(j)
-            print('\n')
+class ImgPathIterator:
+    def __init__(self, source: str) -> None:
+        """
+        Инициализирует итератор.
 
+        Args:
+            source (str): Путь к CSV-файлу (.csv) или директории.
 
-def make_valid_txt_and_print_invalid(blocks: list[list[str]])->list[list[str]]:
-    """
-    вывод некорректных анекет и заполнение списка с правильными
-    """
+        Raises:
+            ValueError: Если source не является CSV-файлом или директорией.
+            OSError: При ошибках чтения файла или директории.
+        """
+        self.paths: list[str] = []
+        self._index: int = 0
 
-    valid = []
-    invalid = []
+        if os.path.isfile(source) and source.endswith(".csv"):
+            try:
+                with open(source, "r", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    if "absolute_path" not in reader.fieldnames:
+                        raise ValueError("CSV должен содержать колонку 'absolute_path'")
+                    self.paths = [row["absolute_path"] for row in reader]
+            except (OSError, csv.Error) as e:
+                raise OSError(f"Ошибка чтения CSV-файла '{source}': {e}")
 
-    for block in blocks:
-        value = get_tele_or_email(block)
-        if value is None:
-            invalid.append(block)
-            continue
-        if is_not_email(value):
-            valid.append(block)
-            continue
+        elif os.path.isdir(source):
+            try:
+                self.paths = [
+                    os.path.abspath(os.path.join(source, f))
+                    for f in os.listdir(source)
+                    if os.path.isfile(os.path.join(source, f))
+                ]
+            except OSError as e:
+                raise OSError(f"Ошибка чтения директории '{source}': {e}")
 
-        if is_valid_num(value):
-            valid.append(block)
         else:
-            invalid.append(block)
+            raise ValueError(
+                "Параметр 'source' должен быть либо CSV-файлом с расширением .csv, "
+                "либо существующей директорией."
+            )
 
-    if invalid:
-        print_invalid(invalid)
-    return valid
+    def __iter__(self) -> collections.abc.Iterable[str]:
+        """Возвращает итератор по путям."""
+        return iter(self.paths)
+
+    def __len__(self) -> int:
+        """Возвращает количество путей."""
+        return len(self.paths)
+
+    def __next__(self) -> str:
+        """Возвращает следующий путь или вызывает StopIteration."""
+        if self._index < len(self.paths):
+            path = self.paths[self._index]
+            self._index += 1
+            return path
+        raise StopIteration
 
 
-
-def parser_t():
-    """
-    функция нужна для ввода пути файла
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("path_to_file")
-    parser.add_argument(
-        "-o", "--output",
-        help="Путь для сохранения очищенного файла",
-        default="cleared_data.txt"
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Скачивание изображений по ключевому слову с аннотацией и итератором."
     )
-    return parser.parse_args()
-
-def save_blocks_to_new_file(blocks: list[list[str]], output_path: str):
-    """
-    запрос абсолютного пути для сохранения и само сохранение
-    """
-    with open(output_path, 'w', encoding="utf-8") as f:
-        for i, block in enumerate(blocks, 1):
-            f.write(f"{i})\n")
-            f.write("\n".join(block))
-            f.write("\n\n")
-
-def main():
-    a = parser_t()
-
-    input_file = a.path_to_file
-    output_path = a.output
-
-    print(f"\nОткрытие файла {input_file}\n")
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        required=True,
+        help="Путь к папке для сохранения изображений",
+    )
+    parser.add_argument(
+        "--annotation_file",
+        type=str,
+        required=True,
+        help="Путь к CSV-файлу аннотации",
+    )
+    parser.add_argument(
+        "--keyword",
+        type=str,
+        default="pig",
+        help="Ключевое слово для поиска изображений (по умолчанию: 'pig')",
+    )
+    parser.add_argument(
+        "--duration",
+        type=int,
+        default=60,
+        help="Максимальное время скачивания в секундах (по умолчанию: 60)",
+    )
+    parser.add_argument(
+        "--min_images",
+        type=int,
+        default=50,
+        help="Минимальное количество изображений (по умолчанию: 50)",
+    )
 
     try:
-        list_of_users = open_and_split(input_file)
-        cleared_users = print_and_delete(list_of_users)
-        save_blocks_to_new_file(cleared_users, output_path)
-    except Exception as e:
-        print("Ошибка: ", e)
+        args = parser.parse_args()
+
+        # Скачивание
+        count, elapsed = download_img(
+            keyword=args.keyword,
+            out_dir=args.output_dir,
+            min_img=args.min_images,
+            dur=args.duration
+        )
+
+        print(f"\nСкачано изображений: {count}")
+        print(f"Затрачено времени: {elapsed:.2f} секунд")
+
+        # Создание CSV
+        create_csv(args.output_dir, args.annotation_file)
+        print(f"\nАннотация сохранена в: {args.annotation_file}")
+
+        # Демонстрация итератора
+        print("\nПример использования итератора (первые 4 пути):")
+        try:
+            iterator = ImgPathIterator(args.annotation_file)
+            for i in range(4):
+                try:
+                    path = next(iterator)
+                    print(f"{i + 1}: {path}")
+                except StopIteration:
+                    print("(Больше путей нет)")
+                    break
+        except (OSError, ValueError) as e:
+            print(f"Ошибка при использовании итератора: {e}")
+
+    except (ValueError, OSError, KeyboardInterrupt) as e:
+        print(f"Ошибка: {e}")
+        exit(1)
 
 
-if name == "main":
+if __name__ == "__main__":
     main()
