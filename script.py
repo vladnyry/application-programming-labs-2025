@@ -4,8 +4,9 @@ import csv
 import threading
 import time
 import os
-from typing import List, Tuple, Iterator
-from icrawler.builtin import GoogleImageCrawler
+from typing import Tuple
+
+from icrawler.builtin import BingImageCrawler
 
 
 """
@@ -83,7 +84,7 @@ def download_img(
 
     def crawler_task() -> None:
         """Задача для фонового потока: запуск краулера."""
-        crawler = GoogleImageCrawler(storage={"root_dir": out_dir})
+        crawler = BingImageCrawler(storage={"root_dir": out_dir})
         crawler.crawl(keyword=keyword, max_num=10000)
 
     thread = threading.Thread(target=crawler_task)
@@ -210,7 +211,13 @@ class ImgPathIterator:
         raise StopIteration
 
 
-def main() -> None:
+def parse_args() -> argparse.Namespace:
+    """
+    Парсит аргументы командной строки.
+
+    Returns:
+        argparse.Namespace: Объект с аргументами.
+    """
     parser = argparse.ArgumentParser(
         description="Скачивание изображений по ключевому слову с аннотацией и итератором."
     )
@@ -244,9 +251,13 @@ def main() -> None:
         default=50,
         help="Минимальное количество изображений (по умолчанию: 50)",
     )
+    return parser.parse_args()
 
+
+
+def main() -> None:
     try:
-        args = parser.parse_args()
+        args = parse_args()
 
         # Скачивание
         count, elapsed = download_img(
@@ -280,7 +291,6 @@ def main() -> None:
     except (ValueError, OSError, KeyboardInterrupt) as e:
         print(f"Ошибка: {e}")
         exit(1)
-
 
 if __name__ == "__main__":
     main()
