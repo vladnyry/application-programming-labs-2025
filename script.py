@@ -202,13 +202,25 @@ class ImgPathIterator:
         """Возвращает количество путей."""
         return len(self.paths)
 
-    def __next__(self) -> str:
-        """Возвращает следующий путь или вызывает StopIteration."""
-        if self._index < len(self.paths):
-            path = self.paths[self._index]
-            self._index += 1
-            return path
-        raise StopIteration
+    def next(self) -> str:
+        """Возвращает следующий путь, циклически."""
+        if not self.paths:
+            raise StopIteration("No paths available.")
+        self._index = (self._index + 1) % len(self.paths)
+        return self.paths[self._index]
+
+    def prev(self) -> str:
+        """Возвращает предыдущий путь, циклически."""
+        if not self.paths:
+            raise StopIteration("No paths available.")
+        self._index = (self._index - 1) % len(self.paths)
+        return self.paths[self._index]
+
+    def current(self) -> str:
+        """Возвращает текущий путь (без сдвига индекса)."""
+        if not self.paths:
+            raise IndexError("No paths available.")
+        return self.paths[self._index]
 
 
 def parse_args() -> argparse.Namespace:
